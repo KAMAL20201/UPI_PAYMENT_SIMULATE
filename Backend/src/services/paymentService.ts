@@ -15,6 +15,11 @@ const PAYMENT_EXPIRY_MINUTES = Number.parseInt(
   process.env.PAYMENT_EXPIRY_MINUTES ?? "15",
   10
 );
+const AUTO_SIMULATION_DELAY = Number.parseInt(
+  process.env.AUTO_SIMULATION_DELAY ?? "30000",
+  10
+); // Default: 30 seconds
+const AUTO_SIMULATION_ENABLED = process.env.AUTO_SIMULATION_ENABLED !== "false"; // Default: true
 
 const buildUpiIntentUrl = (params: {
   upiId: string;
@@ -23,16 +28,25 @@ const buildUpiIntentUrl = (params: {
   note?: string;
   transactionRef: string;
 }) => {
+  // Validate transaction reference is alphanumeric only (NPCI requirement)
+  if (!/^[A-Z0-9]+$/.test(params.transactionRef)) {
+    throw new Error(
+      "Transaction reference must contain only alphanumeric characters (no special characters or hyphens)"
+    );
+  }
+
+  // Build query parameters - URLSearchParams handles encoding automatically
   const query = new URLSearchParams({
-    pa: params.upiId,
-    am: params.amount.toFixed(2),
-    cu: "INR",
-    tn: params.note ?? "UPI Payment",
-    tr: params.transactionRef,
+    pa: params.upiId.trim(), // Payee Address (UPI ID)
+    am: params.amount.toFixed(2), // Amount
+    cu: "INR", // Currency
+    tn: (params.note ?? "UPI Payment").trim(), // Transaction Note
+    tr: params.transactionRef, // Transaction Reference (must be alphanumeric)
   });
 
-  if (params.payerName) {
-    query.append("pn", params.payerName);
+  // Payee Name (optional but recommended for better UX)
+  if (params.payerName && params.payerName.trim()) {
+    query.append("pn", params.payerName.trim());
   }
 
   return `upi://pay?${query.toString()}`;
@@ -86,12 +100,64 @@ const insertStatusLog = async (
   }
 };
 
+/**
+ * Schedule automatic random payment simulation
+ * After a delay, randomly simulates either SUCCESS or FAILED status
+ */
+const scheduleAutoSimulation = (paymentId: string, delayMs: number): void => {
+  if (!AUTO_SIMULATION_ENABLED) {
+    return;
+  }
+
+  setTimeout(async () => {
+    try {
+      // Check if payment still exists and is pending
+      const payment = await getPayment(paymentId);
+      if (!payment || payment.status !== PaymentStatus.PENDING) {
+        console.log(
+          `Skipping auto-simulation for payment ${paymentId}: payment not found or already finalized`
+        );
+        return;
+      }
+
+      // Randomly choose SUCCESS or FAILED (50/50 chance)
+      const randomStatus =
+        Math.random() < 0.5 ? PaymentStatus.SUCCESS : PaymentStatus.FAILED;
+
+      const message =
+        randomStatus === PaymentStatus.SUCCESS
+          ? "Auto-simulated successful payment"
+          : "Auto-simulated failed payment";
+
+      await simulateStatusChange(paymentId, randomStatus, message);
+      console.log(
+        `Auto-simulated payment ${paymentId} as ${randomStatus} after ${delayMs}ms`
+      );
+    } catch (error) {
+      console.error(
+        `Error in auto-simulation for payment ${paymentId}:`,
+        error instanceof Error ? error.message : error
+      );
+    }
+  }, delayMs);
+};
+
 export const createPayment = async (
   input: CreatePaymentInput
 ): Promise<PaymentRecord> => {
-  if (!input.upiId || input.upiId.trim().length < 3) {
+  const trimmedUpiId = input.upiId?.trim() || "";
+
+  if (!trimmedUpiId || trimmedUpiId.length < 3) {
     throw new Error("UPI ID is required and must be at least 3 characters.");
   }
+
+  // Basic UPI ID format validation (should contain @ symbol)
+  if (!trimmedUpiId.includes("@")) {
+    throw new Error(
+      "Invalid UPI ID format. UPI ID should be in format: username@bankname or username@upi"
+    );
+  }
+
   if (!Number.isFinite(input.amount) || input.amount <= 0) {
     throw new Error("Amount must be a positive number.");
   }
@@ -99,9 +165,13 @@ export const createPayment = async (
   console.log(input, "input");
 
   const paymentId = uuidv4();
-  const transactionRef = uuidv4();
+  // Transaction reference must be alphanumeric only (no hyphens or special characters)
+  // NPCI rejects transaction IDs with special characters (effective Feb 1, 2025)
+  // Removing hyphens and converting to uppercase for consistency
+  const transactionRef = uuidv4().replace(/-/g, "").toUpperCase();
+
   const upiIntentUrl = buildUpiIntentUrl({
-    upiId: input.upiId.trim(),
+    upiId: trimmedUpiId,
     amount: input.amount,
     payerName: input.payerName?.trim(),
     note: input.note?.trim(),
@@ -122,7 +192,7 @@ export const createPayment = async (
 
   const row = {
     id: paymentId,
-    upi_id: input.upiId.trim(),
+    upi_id: trimmedUpiId,
     amount: input.amount,
     payee_name: input.payerName?.trim() ?? null,
     note: input.note?.trim() ?? null,
@@ -146,7 +216,12 @@ export const createPayment = async (
 
   await insertStatusLog(paymentId, PaymentStatus.PENDING, "Payment created");
 
-  return mapPaymentRecord(data);
+  const paymentRecord = mapPaymentRecord(data);
+
+  // Schedule automatic random payment simulation after configured delay
+  scheduleAutoSimulation(paymentId, AUTO_SIMULATION_DELAY);
+
+  return paymentRecord;
 };
 
 export const getPayments = async (
