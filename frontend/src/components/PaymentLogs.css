@@ -1,0 +1,77 @@
+.payment-logs-container {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.payment-logs-container h3 {
+  margin: 0 0 16px 0;
+  color: #1f2937;
+  font-size: 1.25rem;
+}
+
+.payment-logs-loading,
+.payment-logs-error,
+.payment-logs-empty {
+  padding: 20px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.payment-logs-error {
+  color: #ef4444;
+}
+
+.logs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.log-item {
+  padding: 12px;
+  background-color: #f9fafb;
+  border-radius: 6px;
+  border-left: 3px solid #d1d5db;
+}
+
+.log-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.log-status {
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.log-time {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.log-message {
+  font-size: 0.85rem;
+  color: #4b5563;
+  margin-top: 4px;
+}
+
+@media (max-width: 768px) {
+  .payment-logs-container {
+    padding: 16px;
+  }
+
+  .log-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+}

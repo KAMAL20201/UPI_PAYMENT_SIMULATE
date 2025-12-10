@@ -1,0 +1,59 @@
+# OS Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.localized
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Screenshots and PDFs (if you want to ignore them)
+*.png
+*.jpg
+*.jpeg
+*.pdf
+!**/src/**/*.png
+!**/src/**/*.jpg
+!**/src/**/*.jpeg
+
+# Other project folders (if they exist in this directory)
+# Uncomment if needed:
+# 12_345/
+# SneakInMarket/
+# dsa_learn_gui/
+# graphql-server-example/
+# learnNode/
+# phot-studio*/
+# shiprocket-mcp/
+# system-design/
+# template-generator/
+# upstox-alert/
+# upstox-dashboard/
